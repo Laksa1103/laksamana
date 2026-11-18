@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LB3 Mobile Monitor & Excel Exporter</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS (xlsx) untuk Export Multi-Sheet Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-24 selection:bg-emerald-500 selection:text-white">
+
+    <!-- MOBILE HEADER -->
+    <header class="bg-slate-900/95 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+            <div class="bg-gradient-to-tr from-emerald-600 to-teal-500 text-white p-2 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center">
+                <i class="fa-solid fa-biohazard text-base"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-sm tracking-tight text-white flex items-center gap-1.5">
+                    MONITORING LB3
+                </h1>
+                <p class="text-[10px] text-slate-400">Input Lapangan & Export Excel</p>
+            </div>
+        </div>
+
+        <!-- TOMBOL UTAMA TARIK EXCEL -->
+        <button onclick="exportFullExcel()" class="flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white px-3 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-900/40 transition-all">
+            <i class="fa-solid fa-file-excel text-sm"></i>
+            <span>Tarik Excel</span>
+        </button>
+    </header>
+
+    <!-- CONTENT CONTAINER -->
+    <main class="max-w-md mx-auto p-4 space-y-4">
+
+        <!-- TAB 1: DASHBOARD & RINGKASAN -->
+        <div id="tab-dashboard" class="space-y-4 view-section">
+            
+            <!-- Banner Download Excel -->
+            <div class="bg-gradient-to-r from-emerald-950 to-slate-900 border border-emerald-800/60 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                <div class="space-y-1 pr-2">
+                    <div class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-circle-check"></i> Siap Laporan Excel (.xlsx)
+                    </div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed">Hasil input dari HP otomatis tersusun ke sheet <b>Dashboard</b>, <b>Data LB3 Harian</b>, <b>Bulanan</b>, & <b>Master Sifat</b>.</p>
+                </div>
+                <button onclick="exportFullExcel()" class="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold px-3.5 py-2.5 rounded-xl text-xs shadow-md transition-all">
+                    <i class="fa-solid fa-download block text-center text-sm mb-0.5"></i>
+                    Unduh
+                </button>
+            </div>
+
+            <!-- KPI Cards Grid -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg">
+                    <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Saldo Limbah TPS</div>
+                    <div id="m-saldo" class="text-2xl font-extrabold text-white mt-1 code-font">394</div>
+                    <div class="text-[10px] text-slate-400 mt-1 flex justify-between">
+                        <span>Masuk: <b id="m-masuk" class="text-emerald-400">394</b></span>
+                        <span>Keluar: <b id="m-keluar" class="text-sky-400">0</b></span>
+                    </div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 shadow-lg">
+                    <div class="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Terlambat (&gt;180 Hr)</div>
+                    <div id="m-terlambat" class="text-2xl font-extrabold text-rose-400 mt-1 code-font">8</div>
+                    <div class="text-[10px] text-rose-300/80 mt-1">Prioritas Diangkut</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] font-bold text-emerald-400 uppercase">Status Aman</div>
+                        <div id="m-aman" class="text-lg font-extrabold text-emerald-400 code-font">8 Lot</div>
+                    </div>
+                    <i class="fa-solid fa-shield-check text-emerald-500/30 text-2xl"></i>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 shadow-lg flex items-center justify-between">
+                    <div>
+                        <div class="text-[10px] font-bold text-amber-400 uppercase">Segera Angkut</div>
+                        <div id="m-warning" class="text-lg font-extrabold text-amber-400 code-font">9 Lot</div>
+                    </div>
+                    <i class="fa-solid fa-clock text-amber-500/30 text-2xl"></i>
+                </div>
+            </div>
+
+            <!-- Quick Input CTA -->
+            <button onclick="switchTab('input')" class="w-full bg-sky-600 hover:bg-sky-500 active:scale-[0.99] text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-sky-900/30 flex items-center justify-center gap-2 text-xs transition-all">
+                <i class="fa-solid fa-plus-circle text-base"></i>
+                <span>INPUT TRANSAKSI LIMBAH B3 BARU</span>
+            </button>
+
+            <!-- Daftar Peringatan Masa Simpan -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-slate-200">Status Masa Simpan Kritis</h3>
+                    <span class="text-[10px] text-slate-400" id="total-records-badge">25 Transaksi</span>
+                </div>
+                <div id="mobile-critical-list" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: FORM INPUT CEPAT DI HP -->
+        <div id="tab-input" class="space-y-4 view-section hidden">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg">
+                <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+                    <div>
+                        <h3 class="text-sm font-bold text-white">Form Input Limbah B3</h3>
+                        <p class="text-[10px] text-slate-400">Otomatis mengisi Kode B3, Karakteristik & Batas Simpan</p>
+                    </div>
+                    <span class="bg-sky-950 text-sky-400 border border-sky-800 px-2 py-0.5 rounded text-[10px] code-font" id="form-no-badge">#26</span>
+                </div>
+
+                <form onsubmit="saveTransaction(event)" class="space-y-3 text-xs">
+                    <!-- Jenis Transaksi: Masuk / Keluar -->
+                    <div>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tipe Pencatatan</label>
+                        <div class="grid grid-cols-2 gap-2 mt-1">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="tipe_transaksi" value="MASUK" checked onchange="toggleTransaksiType()" class="peer hidden">
+                                <div class="text-center py-2 rounded-xl border border-slate-700 bg-slate-950 peer-checked:bg-emerald-950 peer-checked:border-emerald-500 peer-checked:text-emerald-400 font-bold transition-all">
+                                    <i class="fa-solid fa-arrow-down mr-1"></i> Limbah Masuk
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="tipe_transaksi" value="KELUAR" onchange="toggleTransaksiType()" class="peer hidden">
+                                <div class="text-center py-2 rounded-xl border border-slate-700 bg-slate-950 peer-checked:bg-sky-950 peer-checked:border-sky-500 peer-checked:text-sky-400 font-bold transition-all">
+                                    <i class="fa-solid fa-truck-moving mr-1"></i> Diangkut Keluar
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-bold uppercase">Tanggal</label>
+                            <input type="date" id="inp-tanggal" required class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-sky-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-bold uppercase">Batas Simpan (Hari)</label>
+                            <input type="number" id="inp-batas" value="180" required class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white code-font focus:border-sky-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- Dropdown Jenis LB3 (Auto-fill Kode & Sifat) -->
+                    <div>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase">Jenis LB3 (Master)</label>
+                        <select id="inp-jenis" onchange="autoFillMasterData()" required class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-sky-500 focus:outline-none">
+                            <!-- Populated by JS -->
+                        </select>
+                    </div>
+
+                    <!-- Info Auto-Fill Badge -->
+                    <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between text-[11px]">
+                        <div>
+                            <span class="text-slate-400">Kode B3:</span> <strong id="auto-kode" class="text-sky-400 code-font">B105d</strong>
+                        </div>
+                        <div>
+                            <span class="text-slate-400">Sifat:</span> <strong id="auto-sifat" class="text-amber-400">Mudah Menyala</strong>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] text-slate-400 font-bold uppercase">Nama Limbah Spesifik</label>
+                        <input type="text" id="inp-nama" placeholder="Contoh: Oli Bekas, Kaleng Cat, Majun..." required class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-sky-500 focus:outline-none">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="col-span-1">
+                            <label class="text-[10px] text-slate-400 font-bold uppercase">Sumber/Unit</label>
+                            <select id="inp-unit" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-sky-500 focus:outline-none">
+                                <option value="Workshop">Workshop</option>
+                                <option value="Kantor">Kantor</option>
+                                <option value="Kantor dan Mess Karyawan">Kantor & Mess</option>
+                                <option value="Mess Karyawan">Mess Karyawan</option>
+                                <option value="Bulking / Tangki">Bulking</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-bold uppercase" id="lbl-jumlah">Jumlah Masuk</label>
+                            <input type="number" step="any" id="inp-jumlah" placeholder="0" required class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:border-sky-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-400 font-bold uppercase">Satuan</label>
+                            <select id="inp-satuan" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-sky-500 focus:outline-none">
+                                <option value="Liter">Liter</option>
+                                <option value="Kaleng">Kaleng</option>
+                                <option value="Bh">Bh</option>
+                                <option value="Kg">Kg</option>
+                                <option value="Drum">Drum</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Tambahan Field Jika Limbah Keluar -->
+                    <div id="field-keluar-extra" class="hidden space-y-2.5 pt-2 border-t border-slate-800">
+                        <div>
+                            <label class="text-[10px] text-sky-400 font-bold uppercase">Transporter / Pengelola Pihak Ke-3</label>
+                            <input type="text" id="inp-transporter" placeholder="Nama PT Pengangkut Limbah B3" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-sky-400 font-bold uppercase">No. Manifest / Keterangan</label>
+                            <input type="text" id="inp-keterangan" placeholder="No. Festronik / BAST" class="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-emerald-900/40 mt-2 transition-all flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>SIMPAN KE DATA MONITORING</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB 3: DATA LOG HARIAN -->
+        <div id="tab-log" class="space-y-3 view-section hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-white">Data LB3 Harian</h3>
+                    <p class="text-[10px] text-slate-400">Tersinkronisasi otomatis untuk file Excel</p>
+                </div>
+                <button onclick="exportFullExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i> Export .xlsx
+                </button>
+            </div>
+
+            <div class="flex gap-2">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                    <input type="text" id="search-log" onkeyup="renderLogList()" placeholder="Cari limbah, kode, unit..." class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <select id="filter-status" onchange="renderLogList()" class="bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-slate-200 focus:outline-none">
+                    <option value="">Semua Status</option>
+                    <option value="TERLAMBAT">TERLAMBAT</option>
+                    <option value="SEGERA DIANGKUT">SEGERA</option>
+                    <option value="AMAN">AMAN</option>
+                </select>
+            </div>
+
+            <div id="mobile-log-list" class="space-y-2.5">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- TAB 4: BARCODE & SINKRONISASI EXCEL -->
+        <div id="tab-excel" class="space-y-4 view-section hidden">
+            <!-- Export Section -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-emerald-950 border border-emerald-800 rounded-xl text-emerald-400">
+                        <i class="fa-solid fa-file-excel text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-white">Tarik Output Laporan Excel</h3>
+                        <p class="text-[11px] text-slate-400">Format standar Monitoring_LB3.xlsx (Multi-Sheet)</p>
+                    </div>
+                </div>
+                <button onclick="exportFullExcel()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl text-xs shadow-lg flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i> UNDUH FILE EXCEL SEKARANG (.XLSX)
+                </button>
+            </div>
+
+            <!-- Import Section -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3">
+                <h3 class="text-xs font-bold text-slate-200">Muat Data dari File Excel Lama</h3>
+                <p class="text-[11px] text-slate-400">Jika Anda sudah punya file <b>Monitoring_LB3.xlsx</b> dengan data tambahan, unggah di sini untuk melanjutkan input di HP.</p>
+                <label class="block w-full text-center px-4 py-3 rounded-xl bg-slate-950 hover:bg-slate-800 border border-dashed border-slate-700 text-sky-400 text-xs font-semibold cursor-pointer transition-all">
+                    <i class="fa-solid fa-upload mr-1.5"></i> Pilih File Excel (.xlsx)
+                    <input type="file" accept=".xlsx, .xls" class="hidden" onchange="importFromExcel(event)">
+                </label>
+                <button onclick="resetToDefaultData()" class="w-full text-center text-[11px] text-slate-500 hover:text-rose-400 py-1">
+                    Reset ke Data Awal Excel
+                </button>
+            </div>
+
+            <!-- QR Code Akses Cepat -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-center shadow-lg">
+                <h3 class="text-xs font-bold text-white">QR Code Akses HP Lapangan</h3>
+                <p class="text-[10px] text-slate-400 mt-0.5">Tempel di TPS LB3 agar petugas mudah input via HP</p>
+                <div class="my-3 p-3 bg-white rounded-2xl inline-block shadow" id="qr-container"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-16 inset-x-4 max-w-md mx-auto bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-2xl text-xs font-bold flex items-center justify-between z-50 transform -translate-y-24 opacity-0 transition-all duration-300">
+        <span id="toast-msg">Data berhasil disimpan!</span>
+        <i class="fa-solid fa-circle-check text-base"></i>
+    </div>
+
+    <!-- MOBILE BOTTOM NAVIGATION BAR -->
+    <nav class="fixed bottom-0 inset-x-0 bg-slate-900/95 border-t border-slate-800 backdrop-blur-md z-40 max-w-md mx-auto grid grid-cols-4 py-2 text-center">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn text-emerald-400 flex flex-col items-center justify-center py-1">
+            <i class="fa-solid fa-chart-pie text-sm"></i>
+            <span class="text-[10px] mt-1 font-semibold">Ringkasan</span>
+        </button>
+        <button onclick="switchTab('input')" id="nav-input" class="nav-btn text-slate-400 flex flex-col items-center justify-center py-1">
+            <div class="bg-sky-600 text-white w-7 h-7 rounded-full flex items-center justify-center -mt-3 shadow-lg border-2 border-slate-900">
+                <i class="fa-solid fa-plus text-xs"></i>
+            </div>
+            <span class="text-[10px] mt-0.5 font-semibold">Input HP</span>
+        </button>
+        <button onclick="switchTab('log')" id="nav-log" class="nav-btn text-slate-400 flex flex-col items-center justify-center py-1">
+            <i class="fa-solid fa-list-check text-sm"></i>
+            <span class="text-[10px] mt-1 font-semibold">Data Log</span>
+        </button>
+        <button onclick="switchTab('excel')" id="nav-excel" class="nav-btn text-slate-400 flex flex-col items-center justify-center py-1">
+            <i class="fa-solid fa-file-excel text-sm"></i>
+            <span class="text-[10px] mt-1 font-semibold">Excel & QR</span>
+        </button>
+    </nav>
+
+    <script>
+        // Master Data sesuai sheet 'sifat' di Monitoring_LB3.xlsx
+        const masterSifat = [
+            { jenis: "Minyak Pelumas Bekas", kode: "B105d", unit: "Workshop", sifat: "Mudah Menyala", satuan: "Liter", batas: 180 },
+            { jenis: "Kain Majun Bekas", kode: "8110d", unit: "Workshop", sifat: "Beracun", satuan: "Kaleng", batas: 180 },
+            { jenis: "Filter Bekas", kode: "B109d", unit: "Workshop", sifat: "Beracun", satuan: "Bh", batas: 180 },
+            { jenis: "Aki/Baterai Bekas", kode: "A102d", unit: "Workshop", sifat: "Korosif", satuan: "Bh", batas: 180 },
+            { jenis: "Kemasan Bekas B3", kode: "9104d", unit: "Kantor", sifat: "Beracun", satuan: "Kaleng", batas: 180 },
+            { jenis: "Limbah Elektronik", kode: "B107d", unit: "Kantor", sifat: "Beracun", satuan: "Bh", batas: 180 },
+            { jenis: "Kemasan Bekas Tinta", kode: "B321-4", unit: "Kantor", sifat: "Beracun", satuan: "Bh", batas: 180 },
+            { jenis: "Sisa Produk Rumah Tangga Mengandung B3 & LB3", kode: "A108d", unit: "Kantor dan Mess Karyawan", sifat: "Beracun", satuan: "Kaleng", batas: 180 },
+            { jenis: "Sampah Elektronik", kode: "B107d", unit: "Mess Karyawan", sifat: "Beracun", satuan: "Bh", batas: 180 },
+            { jenis: "Sampah Kemasan Bekas B3", kode: "B1104d", unit: "Mess Karyawan", sifat: "Beracun", satuan: "Bh", batas: 180 }
+        ];
+
+        // Data Awal persis seperti sheet 'Data LB3 Harian' di file Excel Anda
+        const defaultLogData = [
+            { no: 1, bulan: "Sep", tglMasuk: "2024-09-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 2, bulan: "Sep", tglMasuk: "2024-09-17", limbahMasuk: "Oil Filter", jenis: "Filter Bekas", kode: "B109d", sifat: "Beracun", unit: "Workshop", satuan: "Bh", masuk: 1, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 3, bulan: "Jan", tglMasuk: "2025-01-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 4, bulan: "Apr", tglMasuk: "2025-04-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 5, bulan: "Jul", tglMasuk: "2025-07-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 6, bulan: "Okt", tglMasuk: "2025-10-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 7, bulan: "Jan", tglMasuk: "2026-01-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 8, bulan: "Apr", tglMasuk: "2026-04-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 9, bulan: "Jul", tglMasuk: "2026-07-13", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 10, bulan: "Okt", tglMasuk: "2026-10-01", limbahMasuk: "Oli Bekas", jenis: "Minyak Pelumas Bekas", kode: "B105d", sifat: "Mudah Menyala", unit: "Workshop", satuan: "Liter", masuk: 30, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 11, bulan: "Jun", tglMasuk: "2026-06-10", limbahMasuk: "Kaleng Thinner", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 7, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 12, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Aki/Baterai Bekas", jenis: "Aki/Baterai Bekas", kode: "A102d", sifat: "Korosif", unit: "Workshop", satuan: "Bh", masuk: 5, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 13, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Jerigen bekas Chemtreat", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Bh", masuk: 11, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 14, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Kaleng cat", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 36, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 15, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Majun Terkontaminasi", jenis: "Kain Majun Bekas", kode: "8110d", sifat: "Beracun", unit: "Workshop", satuan: "Bh", masuk: 4, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 16, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Kaleng chemical", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 8, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 17, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Botol terkontaminasi", jenis: "Sisa Produk Rumah Tangga Mengandung B3 & LB3", kode: "A108d", sifat: "Beracun", unit: "Kantor dan Mess Karyawan", satuan: "Bh", masuk: 6, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 18, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Air Filter", jenis: "Filter Bekas", kode: "B109d", sifat: "Beracun", unit: "Workshop", satuan: "Bh", masuk: 1, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 19, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Jerigen/Galon Bekas Oli", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Bh", masuk: 2, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 20, bulan: "May", tglMasuk: "2026-05-13", limbahMasuk: "Kuas/Roll cat", jenis: "Sisa Produk Rumah Tangga Mengandung B3 & LB3", kode: "A108d", sifat: "Beracun", unit: "Kantor dan Mess Karyawan", satuan: "Bh", masuk: 34, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 21, bulan: "Oct", tglMasuk: "2026-10-15", limbahMasuk: "Kaleng cat", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 1, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 22, bulan: "Oct", tglMasuk: "2026-10-20", limbahMasuk: "Kaleng Thinner", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 2, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 23, bulan: "Oct", tglMasuk: "2026-10-20", limbahMasuk: "Kaleng cat", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 2, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 24, bulan: "Oct", tglMasuk: "2026-10-21", limbahMasuk: "Kaleng cat", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 3, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" },
+            { no: 25, bulan: "Oct", tglMasuk: "2026-10-21", limbahMasuk: "Kaleng Thinner", jenis: "Kemasan Bekas B3", kode: "9104d", sifat: "Beracun", unit: "Kantor", satuan: "Kaleng", masuk: 1, keluar: 0, tglKeluar: "", batas: 180, transporter: "", keterangan: "" }
+        ];
+
+        let logData = JSON.parse(localStorage.getItem('lb3_mobile_records')) || JSON.parse(JSON.stringify(defaultLogData));
+
+        document.addEventListener("DOMContentLoaded", () => {
+            initFormOptions();
+            recalculateAll();
+            renderAll();
+            new QRCode(document.getElementById('qr-container'), { text: window.location.href, width: 140, height: 140 });
+        });
+
+        function initFormOptions() {
+            const sel = document.getElementById('inp-jenis');
+            sel.innerHTML = '';
+            masterSifat.forEach((item, idx) => {
+                sel.innerHTML += `<option value="${idx}">${item.jenis} (${item.kode})</option>`;
+            });
+            document.getElementById('inp-tanggal').value = new Date().toISOString().split('T')[0];
+            autoFillMasterData();
+        }
+
+        function autoFillMasterData() {
+            const idx = document.getElementById('inp-jenis').value;
+            const m = masterSifat[idx];
+            if (!m) return;
+            document.getElementById('auto-kode').textContent = m.kode;
+            document.getElementById('auto-sifat').textContent = m.sifat;
+            document.getElementById('inp-unit').value = m.unit;
+            document.getElementById('inp-satuan').value = m.satuan;
+            document.getElementById('inp-batas').value = m.batas;
+        }
+
+        function toggleTransaksiType() {
+            const tipe = document.querySelector('input[name="tipe_transaksi"]:checked').value;
+            const extra = document.getElementById('field-keluar-extra');
+            const lbl = document.getElementById('lbl-jumlah');
+            if (tipe === "KELUAR") {
+                extra.classList.remove('hidden');
+                lbl.textContent = "Jumlah Keluar";
+            } else {
+                extra.classList.add('hidden');
+                lbl.textContent = "Jumlah Masuk";
+            }
+        }
+
+        function recalculateAll() {
+            const refDate = new Date();
+            logData.forEach((row, index) => {
+                row.no = index + 1;
+                row.saldo = (Number(row.masuk) || 0) - (Number(row.keluar) || 0);
+                const tgl = new Date(row.tglMasuk);
+                const diffTime = refDate - tgl;
+                const umur = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+                row.umurHari = umur;
+                row.sisaHari = (Number(row.batas) || 180) - umur;
+
+                if (row.saldo <= 0) {
+                    row.statusMasa = "SELESAI / ANGKUT";
+                    row.statusStok = "KOSONG";
+                } else if (row.sisaHari < 0) {
+                    row.statusMasa = "TERLAMBAT";
+                    row.statusStok = "PRIORITAS";
+                } else if (row.sisaHari <= 30) {
+                    row.statusMasa = "SEGERA DIANGKUT";
+                    row.statusStok = "NORMAL";
+                } else {
+                    row.statusMasa = "AMAN";
+                    row.statusStok = "NORMAL";
+                }
+            });
+            localStorage.setItem('lb3_mobile_records', JSON.stringify(logData));
+            document.getElementById('form-no-badge').textContent = `#${logData.length + 1}`;
+        }
+
+        function renderAll() {
+            const totalMasuk = logData.reduce((s, r) => s + (Number(r.masuk) || 0), 0);
+            const totalKeluar = logData.reduce((s, r) => s + (Number(r.keluar) || 0), 0);
+            const totalSaldo = totalMasuk - totalKeluar;
+
+            const cntAman = logData.filter(r => r.statusMasa === "AMAN").length;
+            const cntSegera = logData.filter(r => r.statusMasa === "SEGERA DIANGKUT").length;
+            const cntTerlambat = logData.filter(r => r.statusMasa === "TERLAMBAT").length;
+
+            document.getElementById('m-saldo').textContent = totalSaldo.toLocaleString('id-ID');
+            document.getElementById('m-masuk').textContent = totalMasuk.toLocaleString('id-ID');
+            document.getElementById('m-keluar').textContent = totalKeluar.toLocaleString('id-ID');
+            document.getElementById('m-aman').textContent = `${cntAman} Lot`;
+            document.getElementById('m-warning').textContent = `${cntSegera} Lot`;
+            document.getElementById('m-terlambat').textContent = cntTerlambat;
+            document.getElementById('total-records-badge').textContent = `${logData.length} Baris Data`;
+
+            // Render Critical List
+            const critList = document.getElementById('mobile-critical-list');
+            critList.innerHTML = '';
+            const priorityItems = logData.filter(r => r.statusMasa === "TERLAMBAT" || r.statusMasa === "SEGERA DIANGKUT");
+            
+            priorityItems.forEach(item => {
+                const isLate = item.statusMasa === "TERLAMBAT";
+                critList.innerHTML += `
+                    <div class="p-2.5 bg-slate-950 rounded-xl border ${isLate ? 'border-rose-900/60' : 'border-amber-900/60'} flex items-center justify-between text-xs">
+                        <div>
+                            <div class="font-bold text-white">${item.limbahMasuk} <span class="text-sky-400 code-font text-[10px]">(${item.kode})</span></div>
+                            <div class="text-[10px] text-slate-400">${item.tglMasuk} • ${item.unit} • <b>${item.saldo} ${item.satuan}</b></div>
+                        </div>
+                        <div class="text-right">
+                            <span class="px-2 py-0.5 rounded text-[9px] font-bold ${isLate ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}">${item.statusMasa}</span>
+                            <div class="text-[10px] font-mono mt-0.5 ${isLate ? 'text-rose-400' : 'text-amber-400'}">${item.sisaHari} hari</div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            renderLogList();
+        }
+
+        function renderLogList() {
+            const q = document.getElementById('search-log').value.toLowerCase();
+            const st = document.getElementById('filter-status').value;
+            const container = document.getElementById('mobile-log-list');
+            container.innerHTML = '';
+
+            const filtered = [...logData].reverse().filter(r => {
+                const matchQ = r.limbahMasuk.toLowerCase().includes(q) || r.jenis.toLowerCase().includes(q) || r.kode.toLowerCase().includes(q) || r.unit.toLowerCase().includes(q);
+                const matchSt = !st || r.statusMasa === st;
+                return matchQ && matchSt;
+            });
+
+            filtered.forEach(r => {
+                let badgeClass = "bg-emerald-950 text-emerald-400 border-emerald-800";
+                if (r.statusMasa === "TERLAMBAT") badgeClass = "bg-rose-950 text-rose-400 border-rose-800";
+                else if (r.statusMasa === "SEGERA DIANGKUT") badgeClass = "bg-amber-950 text-amber-400 border-amber-800";
+
+                container.innerHTML += `
+                    <div class="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 text-xs">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <span class="text-[10px] text-slate-500 code-font">#${r.no}</span>
+                                <span class="font-bold text-white text-sm ml-1">${r.limbahMasuk}</span>
+                                <div class="text-[10px] text-slate-400">${r.jenis}</div>
+                            </div>
+                            <span class="px-2 py-0.5 rounded border text-[9px] font-bold shrink-0 ${badgeClass}">${r.statusMasa}</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-[10px]">
+                            <div>
+                                <span class="text-slate-500 block">Kode / Unit</span>
+                                <strong class="text-sky-400 code-font">${r.kode}</strong> • <span class="text-slate-300">${r.unit}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block">Masuk / Saldo</span>
+                                <strong class="text-emerald-400">+${r.masuk}</strong> / <strong class="text-white">${r.saldo} ${r.satuan}</strong>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-slate-500 block">Tgl & Sisa</span>
+                                <span class="text-slate-300">${r.tglMasuk}</span> (<b class="${r.sisaHari < 0 ? 'text-rose-400' : 'text-slate-200'}">${r.sisaHari}h</b>)
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function saveTransaction(e) {
+            e.preventDefault();
+            const tipe = document.querySelector('input[name="tipe_transaksi"]:checked').value;
+            const idx = document.getElementById('inp-jenis').value;
+            const m = masterSifat[idx];
+            const tgl = document.getElementById('inp-tanggal').value;
+            const qty = parseFloat(document.getElementById('inp-jumlah').value) || 0;
+
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Des"];
+            const dObj = new Date(tgl);
+            const bulanStr = monthNames[dObj.getMonth()] || "Nov";
+
+            const newRecord = {
+                no: logData.length + 1,
+                bulan: bulanStr,
+                tglMasuk: tgl,
+                limbahMasuk: document.getElementById('inp-nama').value,
+                jenis: m.jenis,
+                kode: m.kode,
+                sifat: m.sifat,
+                unit: document.getElementById('inp-unit').value,
+                satuan: document.getElementById('inp-satuan').value,
+                masuk: tipe === "MASUK" ? qty : 0,
+                keluar: tipe === "KELUAR" ? qty : 0,
+                tglKeluar: tipe === "KELUAR" ? tgl : "",
+                batas: parseInt(document.getElementById('inp-batas').value) || 180,
+                transporter: tipe === "KELUAR" ? document.getElementById('inp-transporter').value : "",
+                keterangan: tipe === "KELUAR" ? document.getElementById('inp-keterangan').value : ""
+            };
+
+            logData.push(newRecord);
+            recalculateAll();
+            renderAll();
+            document.getElementById('inp-nama').value = '';
+            document.getElementById('inp-jumlah').value = '';
+            showToast("Input berhasil disimpan! Siap ditarik ke Excel.");
+            switchTab('dashboard');
+        }
+
+        // GENERATE MULTI-SHEET EXCEL SESUAI FORMAT Monitoring_LB3.xlsx
+        function exportFullExcel() {
+            const wb = XLSX.utils.book_new();
+
+            // 1. Sheet Dashboard Ringkasan
+            const totalMasuk = logData.reduce((s, r) => s + (Number(r.masuk) || 0), 0);
+            const totalKeluar = logData.reduce((s, r) => s + (Number(r.keluar) || 0), 0);
+            const totalSaldo = totalMasuk - totalKeluar;
+            const cntAman = logData.filter(r => r.statusMasa === "AMAN").length;
+            const cntSegera = logData.filter(r => r.statusMasa === "SEGERA DIANGKUT").length;
+            const cntTerlambat = logData.filter(r => r.statusMasa === "TERLAMBAT").length;
+
+            const dashboardRows = [
+                ["DASHBOARD MONITORING LB3"],
+                ["Hasil Export Aplikasi Mobile Monitoring LB3"],
+                [],
+                ["Total Transaksi", "Total Masuk", "Total Keluar", "Saldo LB3"],
+                [logData.length, totalMasuk, totalKeluar, totalSaldo],
+                [],
+                ["Status Aman", "Segera Diangkut", "Terlambat", "Prioritas"],
+                [cntAman, cntSegera, cntTerlambat, cntTerlambat],
+                [],
+                ["REKAP PER JENIS LB3"],
+                ["Jenis LB3", "Kode Limbah B3", "Jumlah Masuk", "Jumlah Keluar", "Saldo"]
+            ];
+
+            masterSifat.forEach(m => {
+                const items = logData.filter(r => r.jenis === m.jenis);
+                const mIn = items.reduce((s, r) => s + (Number(r.masuk) || 0), 0);
+                const mOut = items.reduce((s, r) => s + (Number(r.keluar) || 0), 0);
+                dashboardRows.push([m.jenis, m.kode, mIn, mOut, mIn - mOut]);
+            });
+
+            const wsDash = XLSX.utils.aoa_to_sheet(dashboardRows);
+            XLSX.utils.book_append_sheet(wb, wsDash, "Dashboard");
+
+            // 2. Sheet Data LB3 Harian
+            const harianFormatted = logData.map(r => ({
+                "No": r.no,
+                "Bulan": r.bulan,
+                "Tanggal Masuk": r.tglMasuk,
+                "Limbah Masuk": r.limbahMasuk,
+                "Jenis LB3": r.jenis,
+                "Kode Limbah B3": r.kode,
+                "Karakteristik": r.sifat,
+                "Sumber/Unit": r.unit,
+                "Satuan": r.satuan,
+                "Jumlah Masuk": r.masuk,
+                "Jumlah Keluar": r.keluar || 0,
+                "Saldo": r.saldo,
+                "Tanggal Keluar": r.tglKeluar || "",
+                "Umur Simpan (Hari)": r.umurHari,
+                "Batas Simpan (Hari)": r.batas,
+                "Sisa Hari": r.sisaHari,
+                "Status Masa Simpan": r.statusMasa,
+                "Status Stok": r.statusStok,
+                "Transporter/Pengelola": r.transporter || "",
+                "Keterangan": r.keterangan || ""
+            }));
+            const wsHarian = XLSX.utils.json_to_sheet(harianFormatted);
+            XLSX.utils.book_append_sheet(wb, wsHarian, "Data LB3 Harian");
+
+            // 3. Sheet Rekap Bulanan
+            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Des"];
+            const bulananRows = [
+                ["Monitoring Bulanan Limbah B3"],
+                ["No", "Jenis LB3", "Kode Limbah B3", "Karakteristik", "Sumber/Unit", "Satuan", ...months, "TOTAL"]
+            ];
+            masterSifat.forEach((m, idx) => {
+                let rowTotal = 0;
+                const mCounts = months.map(mon => {
+                    const sum = logData.filter(r => r.jenis === m.jenis && r.bulan.toLowerCase().startsWith(mon.toLowerCase().substring(0,2)))
+                                       .reduce((s, r) => s + (Number(r.masuk) || 0), 0);
+                    rowTotal += sum;
+                    return sum;
+                });
+                bulananRows.push([idx + 1, m.jenis, m.kode, m.sifat, m.unit, m.satuan, ...mCounts, rowTotal]);
+            });
+            const wsBulanan = XLSX.utils.aoa_to_sheet(bulananRows);
+            XLSX.utils.book_append_sheet(wb, wsBulanan, "Bulanan");
+
+            // 4. Sheet Master Sifat
+            const sifatFormatted = masterSifat.map(m => ({
+                "Jenis Limbah": m.jenis,
+                "Kode Limbah B3": m.kode,
+                "Sumber/Unit": m.unit,
+                "Karakteristik": m.sifat,
+                "Batas Simpan Default (Hari)": m.batas
+            }));
+            const wsSifat = XLSX.utils.json_to_sheet(sifatFormatted);
+            XLSX.utils.book_append_sheet(wb, wsSifat, "sifat");
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `Monitoring_LB3_${todayStr}.xlsx`);
+            showToast("File Excel berhasil ditarik & diunduh!");
+        }
+
+        function importFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames.find(n => n.toLowerCase().includes('harian')) || workbook.SheetNames[0];
+                const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                if (rows.length > 0) {
+                    logData = rows.map((r, i) => ({
+                        no: r["No"] || i + 1,
+                        bulan: r["Bulan"] || "Nov",
+                        tglMasuk: r["Tanggal Masuk"] ? String(r["Tanggal Masuk"]).split('T')[0] : new Date().toISOString().split('T')[0],
+                        limbahMasuk: r["Limbah Masuk"] || "-",
+                        jenis: r["Jenis LB3"] || "Minyak Pelumas Bekas",
+                        kode: r["Kode Limbah B3"] || "B105d",
+                        sifat: r["Karakteristik"] || "Beracun",
+                        unit: r["Sumber/Unit"] || "Workshop",
+                        satuan: r["Satuan"] || "Liter",
+                        masuk: Number(r["Jumlah Masuk"]) || 0,
+                        keluar: Number(r["Jumlah Keluar"]) || 0,
+                        tglKeluar: r["Tanggal Keluar"] || "",
+                        batas: Number(r["Batas Simpan (Hari)"]) || 180,
+                        transporter: r["Transporter/Pengelola"] || "",
+                        keterangan: r["Keterangan"] || ""
+                    }));
+                    recalculateAll();
+                    renderAll();
+                    showToast(`Berhasil memuat ${logData.length} baris dari Excel!`);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function resetToDefaultData() {
+            if (confirm("Kembalikan data ke bawaan awal file Monitoring_LB3.xlsx?")) {
+                logData = JSON.parse(JSON.stringify(defaultLogData));
+                recalculateAll();
+                renderAll();
+                showToast("Data di-reset ke bawaan awal.");
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('text-emerald-400');
+                el.classList.add('text-slate-400');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-400');
+            document.getElementById(`nav-${tabId}`).classList.add('text-emerald-400');
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            t.classList.remove('-translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                t.classList.add('-translate-y-24', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
